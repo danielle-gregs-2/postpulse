@@ -7,18 +7,9 @@ extend("Checkout::PostPurchase::ShouldRender", async ({ storage }) => {
 
 render("Checkout::PostPurchase::Render", App);
 
-export function App({ extensionPoint }) {
+export function App() {
   const shop = window.location.hostname;
-  const offerUrl = `https://YOUR-APP-URL.com/offer?shop=${shop}`;
-
+  const offerUrl = `https://postpulse-production.up.railway.app/offer?shop=${shop}`;
   window.location.href = offerUrl;
-
   return null;
 }
-```
-
-Save with **Cmd + S**.
-
-Now before we deploy, we need to replace `YOUR-APP-URL.com` with your real app URL. Go to your **first terminal** (the one running the app) and look for a line that says something like:
-```
-Application URL: https://xxxx.trycloudflare.com
