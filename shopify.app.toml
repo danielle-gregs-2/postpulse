@@ -2,7 +2,7 @@
 
 client_id = "43345c2d8954352eb8a8597f10c2b007"
 name = "postpulse"
-application_url = "https://example.com"
+application_url = "https://postpulse-production.up.railway.app"
 embedded = true
 
 [build]
@@ -24,7 +24,7 @@ api_version = "2026-04"
 scopes = "write_metaobject_definitions,write_metaobjects,write_products"
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [ "https://postpulse-production.up.railway.app/api/auth" ]
 
 [product.metafields.app.demo_info]
 type = "single_line_text_field"
