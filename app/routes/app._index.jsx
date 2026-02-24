@@ -43,7 +43,7 @@ export const action = async ({ request }) => {
 
 function Preview({ form }) {
   const [seconds, setSeconds] = useState(
-    form.countdownMin * 60 + form.countdownSec
+    (form.countdownMin || 14) * 60 + (form.countdownSec || 59)
   );
 
   useEffect(() => {
@@ -56,7 +56,7 @@ function Preview({ form }) {
   const secs = String(seconds % 60).padStart(2, "0");
 
   const ctaText =
-    form.ctaCopy +
+    (form.ctaCopy || "Yes! Add to my order") +
     (form.offerPrice ? ` — ${form.offerPrice}` : "") +
     (form.originalPrice ? ` (was ${form.originalPrice})` : "");
 
@@ -87,7 +87,6 @@ function Preview({ form }) {
           )}
         </div>
       )}
-
       <div style={{ padding: "20px 16px" }}>
         <div style={{ fontSize: 22, fontWeight: 700, color: "#1a1a2e", marginBottom: 8 }}>
           {form.title}
@@ -95,27 +94,19 @@ function Preview({ form }) {
         <div style={{ fontSize: 14, color: "#666", marginBottom: 16 }}>
           {form.subtitle}
         </div>
-
         {form.thumbnailUrl && (
           <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", marginBottom: 16, aspectRatio: "16/9", background: "#1a1a2e" }}>
             <img src={form.thumbnailUrl} alt="thumbnail" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.3)" }}>
               <div style={{ width: 48, height: 48, background: "white", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>▶</div>
             </div>
-            {form.ctaDelaySeconds > 0 && (
-              <div style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,0.7)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 4, fontFamily: "monospace" }}>
-                CTA at {form.ctaDelaySeconds}s
-              </div>
-            )}
           </div>
         )}
-
         {form.paragraph && (
           <div style={{ fontSize: 13, color: "#444", lineHeight: 1.6, marginBottom: 20 }}>
             {form.paragraph}
           </div>
         )}
-
         <button style={{
           display: "block", width: "100%",
           background: form.brandColor || "#7c6af7",
@@ -124,9 +115,8 @@ function Preview({ form }) {
           fontSize: 15, fontWeight: 600, cursor: "pointer",
           marginBottom: 10,
         }}>
-          {ctaText || "Yes! Add to my order"}
+          {ctaText}
         </button>
-
         <div style={{ textAlign: "center", fontSize: 12, color: "#888", textDecoration: "underline", cursor: "pointer" }}>
           {form.declineMessage}
         </div>
@@ -142,7 +132,7 @@ export default function Index() {
 
   const [form, setForm] = useState({
     announcementBar: true,
-    barMessage: "⚡ Special one-time offer just for you!",
+    barMessage: "Special one-time offer just for you!",
     showCountdown: true,
     countdownMin: 14,
     countdownSec: 59,
@@ -169,48 +159,104 @@ export default function Index() {
   };
 
   return (
-    <s-page heading="PostPulse — Post-Purchase Offer Builder">
-      <s-button slot="primary-action" variant="primary" onClick={handleSave}>
-        {isSaving ? "Saving..." : "Save Offer"}
-      </s-button>
+    <div style={{ fontFamily: "sans-serif", maxWidth: 1200, margin: "0 auto", padding: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: "#1a1a2e" }}>PostPulse — Offer Builder</h1>
+        <button
+          onClick={handleSave}
+          style={{ background: form.brandColor || "#7c6af7", color: "white", border: "none", padding: "10px 24px", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 15 }}
+        >
+          {isSaving ? "Saving..." : "Save Offer"}
+        </button>
+      </div>
 
       {fetcher.data?.success && (
-        <s-banner tone="success">✅ Settings saved!</s-banner>
+        <div style={{ background: "#d4edda", border: "1px solid #c3e6cb", color: "#155724", padding: "10px 16px", borderRadius: 8, marginBottom: 16 }}>
+          Settings saved successfully!
+        </div>
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 24 }}>
         <div>
-          <s-section heading="Announcement Bar">
-            <s-checkbox label="Show Announcement Bar" checked={form.announcementBar} onChange={(e) => update("announcementBar", e.target.checked)} />
-            <s-text-field label="Bar Message" value={form.barMessage} onChange={(e) => update("barMessage", e.target.value)} />
-            <s-checkbox label="Show Countdown Timer" checked={form.showCountdown} onChange={(e) => update("showCountdown", e.target.checked)} />
-            <s-text-field label="Brand Color (hex)" value={form.brandColor} onChange={(e) => update("brandColor", e.target.value)} />
-          </s-section>
+          <div style={{ background: "white", borderRadius: 12, padding: 20, marginBottom: 16, border: "1px solid #e0e0e0" }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Announcement Bar</h2>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <input type="checkbox" checked={form.announcementBar} onChange={(e) => update("announcementBar", e.target.checked)} />
+              Show Announcement Bar
+            </label>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Bar Message</label>
+              <input type="text" value={form.barMessage} onChange={(e) => update("barMessage", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+            </div>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <input type="checkbox" checked={form.showCountdown} onChange={(e) => update("showCountdown", e.target.checked)} />
+              Show Countdown Timer
+            </label>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Brand Color (hex)</label>
+              <input type="text" value={form.brandColor} onChange={(e) => update("brandColor", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+            </div>
+          </div>
 
-          <s-section heading="Title & Subtitle">
-            <s-text-field label="Headline" value={form.title} onChange={(e) => update("title", e.target.value)} />
-            <s-text-field label="Subtitle" value={form.subtitle} onChange={(e) => update("subtitle", e.target.value)} />
-          </s-section>
+          <div style={{ background: "white", borderRadius: 12, padding: 20, marginBottom: 16, border: "1px solid #e0e0e0" }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Title & Subtitle</h2>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Headline</label>
+              <input type="text" value={form.title} onChange={(e) => update("title", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Subtitle</label>
+              <input type="text" value={form.subtitle} onChange={(e) => update("subtitle", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+            </div>
+          </div>
 
-          <s-section heading="Video">
-            <s-text-field label="Video URL" value={form.videoUrl} placeholder="https://youtube.com/watch?v=..." onChange={(e) => update("videoUrl", e.target.value)} />
-            <s-text-field label="Thumbnail URL" value={form.thumbnailUrl} placeholder="https://..." onChange={(e) => update("thumbnailUrl", e.target.value)} />
-          </s-section>
+          <div style={{ background: "white", borderRadius: 12, padding: 20, marginBottom: 16, border: "1px solid #e0e0e0" }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Video</h2>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Video URL</label>
+              <input type="text" value={form.videoUrl} placeholder="https://youtube.com/watch?v=..." onChange={(e) => update("videoUrl", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Thumbnail URL</label>
+              <input type="text" value={form.thumbnailUrl} placeholder="https://..." onChange={(e) => update("thumbnailUrl", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+            </div>
+          </div>
 
-          <s-section heading="CTA Timing">
-            <s-text-field label="Show CTA after (seconds into video)" value={String(form.ctaDelaySeconds)} onChange={(e) => update("ctaDelaySeconds", e.target.value)} />
-          </s-section>
+          <div style={{ background: "white", borderRadius: 12, padding: 20, marginBottom: 16, border: "1px solid #e0e0e0" }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>CTA Timing</h2>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Show CTA after (seconds into video)</label>
+              <input type="number" value={form.ctaDelaySeconds} onChange={(e) => update("ctaDelaySeconds", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+            </div>
+          </div>
 
-          <s-section heading="Paragraph Content">
-            <s-text-field label="Body Text (max 5,000 chars)" multiline value={form.paragraph} onChange={(e) => update("paragraph", e.target.value)} />
-          </s-section>
+          <div style={{ background: "white", borderRadius: 12, padding: 20, marginBottom: 16, border: "1px solid #e0e0e0" }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Body Text</h2>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Paragraph</label>
+              <textarea value={form.paragraph} onChange={(e) => update("paragraph", e.target.value)} rows={4} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+            </div>
+          </div>
 
-          <s-section heading="CTA Button">
-            <s-text-field label="Button Copy" value={form.ctaCopy} onChange={(e) => update("ctaCopy", e.target.value)} />
-            <s-text-field label="Offer Price" value={form.offerPrice} onChange={(e) => update("offerPrice", e.target.value)} />
-            <s-text-field label="Original Price" value={form.originalPrice} onChange={(e) => update("originalPrice", e.target.value)} />
-            <s-text-field label="Decline Message" value={form.declineMessage} onChange={(e) => update("declineMessage", e.target.value)} />
-          </s-section>
+          <div style={{ background: "white", borderRadius: 12, padding: 20, marginBottom: 16, border: "1px solid #e0e0e0" }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>CTA Button</h2>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Button Copy</label>
+              <input type="text" value={form.ctaCopy} onChange={(e) => update("ctaCopy", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Offer Price</label>
+              <input type="text" value={form.offerPrice} onChange={(e) => update("offerPrice", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Original Price</label>
+              <input type="text" value={form.originalPrice} onChange={(e) => update("originalPrice", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Decline Message</label>
+              <input type="text" value={form.declineMessage} onChange={(e) => update("declineMessage", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+            </div>
+          </div>
         </div>
 
         <div style={{ position: "sticky", top: 20 }}>
@@ -220,6 +266,6 @@ export default function Index() {
           <Preview form={form} />
         </div>
       </div>
-    </s-page>
+    </div>
   );
 }
