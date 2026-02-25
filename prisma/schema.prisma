@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -34,13 +31,13 @@ model OfferSettings {
   id              String  @id @default(cuid())
   shop            String  @unique
   announcementBar Boolean @default(true)
-  barMessage      String  @default("⚡ Special one-time offer just for you!")
+  barMessage      String  @default("Special one-time offer just for you!")
   showCountdown   Boolean @default(true)
   countdownMin    Int     @default(14)
   countdownSec    Int     @default(59)
   brandColor      String  @default("#7c6af7")
-  title           String  @default("Wait — before you go!")
-  subtitle        String  @default("We've got an exclusive upgrade offer available only right now.")
+  title           String  @default("Wait before you go!")
+  subtitle        String  @default("Exclusive upgrade offer available only right now.")
   videoUrl        String  @default("")
   thumbnailUrl    String  @default("")
   ctaDelaySeconds Int     @default(0)
@@ -49,6 +46,9 @@ model OfferSettings {
   offerPrice      String  @default("")
   originalPrice   String  @default("")
   declineMessage  String  @default("No thanks, I'll pass on this deal.")
+  selectedProductId    String  @default("")
+  selectedVariantId    String  @default("")
+  selectedProductTitle String  @default("")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }

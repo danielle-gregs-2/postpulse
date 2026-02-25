@@ -4,11 +4,37 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 
 export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
+  
   const settings = await prisma.offerSettings.findUnique({
     where: { shop: session.shop },
   });
-  return settings || {};
+
+  const response = await admin.graphql(`
+    query {
+      products(first: 50) {
+        edges {
+          node {
+            id
+            title
+            variants(first: 50) {
+              edges {
+                node {
+                  id
+                  title
+                  price
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  `);
+  const data = await response.json();
+  const products = data.data.products.edges.map(e => e.node);
+
+  return { settings: settings || {}, products };
 };
 
 export const action = async ({ request }) => {
@@ -30,6 +56,9 @@ export const action = async ({ request }) => {
     offerPrice: formData.get("offerPrice"),
     originalPrice: formData.get("originalPrice"),
     declineMessage: formData.get("declineMessage"),
+    selectedProductId: formData.get("selectedProductId") || "",
+    selectedVariantId: formData.get("selectedVariantId") || "",
+    selectedProductTitle: formData.get("selectedProductTitle") || "",
   };
 
   await prisma.offerSettings.upsert({
@@ -61,39 +90,18 @@ function Preview({ form }) {
     (form.originalPrice ? ` (was ${form.originalPrice})` : "");
 
   return (
-    <div style={{
-      fontFamily: "sans-serif",
-      background: "#f5f3ff",
-      borderRadius: 16,
-      overflow: "hidden",
-      border: "1px solid #e0e0e0",
-      maxWidth: 360,
-      margin: "0 auto",
-    }}>
+    <div style={{ fontFamily: "sans-serif", background: "#f5f3ff", borderRadius: 16, overflow: "hidden", border: "1px solid #e0e0e0", maxWidth: 360, margin: "0 auto" }}>
       {form.announcementBar && (
-        <div style={{
-          background: form.brandColor || "#7c6af7",
-          color: "white",
-          padding: "10px 16px",
-          textAlign: "center",
-          fontSize: 13,
-          fontWeight: 500,
-        }}>
+        <div style={{ background: form.brandColor || "#7c6af7", color: "white", padding: "10px 16px", textAlign: "center", fontSize: 13, fontWeight: 500 }}>
           <div>{form.barMessage}</div>
           {form.showCountdown && (
-            <div style={{ fontFamily: "monospace", fontSize: 16, marginTop: 4, letterSpacing: 2 }}>
-              {mins}:{secs}
-            </div>
+            <div style={{ fontFamily: "monospace", fontSize: 16, marginTop: 4, letterSpacing: 2 }}>{mins}:{secs}</div>
           )}
         </div>
       )}
       <div style={{ padding: "20px 16px" }}>
-        <div style={{ fontSize: 22, fontWeight: 700, color: "#1a1a2e", marginBottom: 8 }}>
-          {form.title}
-        </div>
-        <div style={{ fontSize: 14, color: "#666", marginBottom: 16 }}>
-          {form.subtitle}
-        </div>
+        <div style={{ fontSize: 22, fontWeight: 700, color: "#1a1a2e", marginBottom: 8 }}>{form.title}</div>
+        <div style={{ fontSize: 14, color: "#666", marginBottom: 16 }}>{form.subtitle}</div>
         {form.thumbnailUrl && (
           <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", marginBottom: 16, aspectRatio: "16/9", background: "#1a1a2e" }}>
             <img src={form.thumbnailUrl} alt="thumbnail" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -103,30 +111,22 @@ function Preview({ form }) {
           </div>
         )}
         {form.paragraph && (
-          <div style={{ fontSize: 13, color: "#444", lineHeight: 1.6, marginBottom: 20 }}>
-            {form.paragraph}
-          </div>
+          <div style={{ fontSize: 13, color: "#444", lineHeight: 1.6, marginBottom: 20 }}>{form.paragraph}</div>
         )}
-        <button style={{
-          display: "block", width: "100%",
-          background: form.brandColor || "#7c6af7",
-          color: "white", border: "none",
-          padding: "14px 16px", borderRadius: 10,
-          fontSize: 15, fontWeight: 600, cursor: "pointer",
-          marginBottom: 10,
-        }}>
+        {form.selectedProductTitle && (
+          <div style={{ fontSize: 12, color: "#888", marginBottom: 8, textAlign: "center" }}>Product: {form.selectedProductTitle}</div>
+        )}
+        <button style={{ display: "block", width: "100%", background: form.brandColor || "#7c6af7", color: "white", border: "none", padding: "14px 16px", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer", marginBottom: 10 }}>
           {ctaText}
         </button>
-        <div style={{ textAlign: "center", fontSize: 12, color: "#888", textDecoration: "underline", cursor: "pointer" }}>
-          {form.declineMessage}
-        </div>
+        <div style={{ textAlign: "center", fontSize: 12, color: "#888", textDecoration: "underline", cursor: "pointer" }}>{form.declineMessage}</div>
       </div>
     </div>
   );
 }
 
 export default function Index() {
-  const loaded = useLoaderData();
+  const { settings: loaded, products } = useLoaderData();
   const fetcher = useFetcher();
   const isSaving = fetcher.state === "submitting";
 
@@ -147,10 +147,23 @@ export default function Index() {
     offerPrice: "",
     originalPrice: "",
     declineMessage: "No thanks, I'll pass on this deal.",
+    selectedProductId: "",
+    selectedVariantId: "",
+    selectedProductTitle: "",
     ...loaded,
   });
 
   const update = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+
+  const selectedProduct = products.find(p => p.id === form.selectedProductId);
+  const variants = selectedProduct ? selectedProduct.variants.edges.map(e => e.node) : [];
+
+  const handleProductChange = (productId) => {
+    const product = products.find(p => p.id === productId);
+    update("selectedProductId", productId);
+    update("selectedProductTitle", product ? product.title : "");
+    update("selectedVariantId", product ? product.variants.edges[0].node.id : "");
+  };
 
   const handleSave = () => {
     const fd = new FormData();
@@ -158,14 +171,15 @@ export default function Index() {
     fetcher.submit(fd, { method: "POST" });
   };
 
+  const inputStyle = { width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14, boxSizing: "border-box" };
+  const labelStyle = { display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 };
+  const sectionStyle = { background: "white", borderRadius: 12, padding: 20, marginBottom: 16, border: "1px solid #e0e0e0" };
+
   return (
     <div style={{ fontFamily: "sans-serif", maxWidth: 1200, margin: "0 auto", padding: 24 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, color: "#1a1a2e" }}>PostPulse — Offer Builder</h1>
-        <button
-          onClick={handleSave}
-          style={{ background: form.brandColor || "#7c6af7", color: "white", border: "none", padding: "10px 24px", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 15 }}
-        >
+        <button onClick={handleSave} style={{ background: form.brandColor || "#7c6af7", color: "white", border: "none", padding: "10px 24px", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 15 }}>
           {isSaving ? "Saving..." : "Save Offer"}
         </button>
       </div>
@@ -178,83 +192,102 @@ export default function Index() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 24 }}>
         <div>
-          <div style={{ background: "white", borderRadius: 12, padding: 20, marginBottom: 16, border: "1px solid #e0e0e0" }}>
+          <div style={sectionStyle}>
             <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Announcement Bar</h2>
             <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
               <input type="checkbox" checked={form.announcementBar} onChange={(e) => update("announcementBar", e.target.checked)} />
               Show Announcement Bar
             </label>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Bar Message</label>
-              <input type="text" value={form.barMessage} onChange={(e) => update("barMessage", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+              <label style={labelStyle}>Bar Message</label>
+              <input type="text" value={form.barMessage} onChange={(e) => update("barMessage", e.target.value)} style={inputStyle} />
             </div>
             <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
               <input type="checkbox" checked={form.showCountdown} onChange={(e) => update("showCountdown", e.target.checked)} />
               Show Countdown Timer
             </label>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Brand Color (hex)</label>
-              <input type="text" value={form.brandColor} onChange={(e) => update("brandColor", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+              <label style={labelStyle}>Brand Color (hex)</label>
+              <input type="text" value={form.brandColor} onChange={(e) => update("brandColor", e.target.value)} style={inputStyle} />
             </div>
           </div>
 
-          <div style={{ background: "white", borderRadius: 12, padding: 20, marginBottom: 16, border: "1px solid #e0e0e0" }}>
+          <div style={sectionStyle}>
             <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Title & Subtitle</h2>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Headline</label>
-              <input type="text" value={form.title} onChange={(e) => update("title", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+              <label style={labelStyle}>Headline</label>
+              <input type="text" value={form.title} onChange={(e) => update("title", e.target.value)} style={inputStyle} />
             </div>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Subtitle</label>
-              <input type="text" value={form.subtitle} onChange={(e) => update("subtitle", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+              <label style={labelStyle}>Subtitle</label>
+              <input type="text" value={form.subtitle} onChange={(e) => update("subtitle", e.target.value)} style={inputStyle} />
             </div>
           </div>
 
-          <div style={{ background: "white", borderRadius: 12, padding: 20, marginBottom: 16, border: "1px solid #e0e0e0" }}>
+          <div style={sectionStyle}>
             <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Video</h2>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Video URL</label>
-              <input type="text" value={form.videoUrl} placeholder="https://youtube.com/watch?v=..." onChange={(e) => update("videoUrl", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+              <label style={labelStyle}>Video URL</label>
+              <input type="text" value={form.videoUrl} placeholder="https://youtube.com/watch?v=..." onChange={(e) => update("videoUrl", e.target.value)} style={inputStyle} />
             </div>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Thumbnail URL</label>
-              <input type="text" value={form.thumbnailUrl} placeholder="https://..." onChange={(e) => update("thumbnailUrl", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+              <label style={labelStyle}>Thumbnail URL</label>
+              <input type="text" value={form.thumbnailUrl} placeholder="https://..." onChange={(e) => update("thumbnailUrl", e.target.value)} style={inputStyle} />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={labelStyle}>Show CTA after (seconds into video)</label>
+              <input type="number" value={form.ctaDelaySeconds} onChange={(e) => update("ctaDelaySeconds", e.target.value)} style={inputStyle} />
             </div>
           </div>
 
-          <div style={{ background: "white", borderRadius: 12, padding: 20, marginBottom: 16, border: "1px solid #e0e0e0" }}>
-            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>CTA Timing</h2>
+          <div style={sectionStyle}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Product to Offer</h2>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Show CTA after (seconds into video)</label>
-              <input type="number" value={form.ctaDelaySeconds} onChange={(e) => update("ctaDelaySeconds", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+              <label style={labelStyle}>Select Product</label>
+              <select value={form.selectedProductId} onChange={(e) => handleProductChange(e.target.value)} style={inputStyle}>
+                <option value="">— Choose a product —</option>
+                {products.map(p => (
+                  <option key={p.id} value={p.id}>{p.title}</option>
+                ))}
+              </select>
             </div>
+            {variants.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <label style={labelStyle}>Select Variant</label>
+                <select value={form.selectedVariantId} onChange={(e) => update("selectedVariantId", e.target.value)} style={inputStyle}>
+                  {variants.map(v => (
+                    <option key={v.id} value={v.id}>{v.title} — ${v.price}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
-          <div style={{ background: "white", borderRadius: 12, padding: 20, marginBottom: 16, border: "1px solid #e0e0e0" }}>
+          <div style={sectionStyle}>
             <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Body Text</h2>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Paragraph</label>
-              <textarea value={form.paragraph} onChange={(e) => update("paragraph", e.target.value)} rows={4} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+              <label style={labelStyle}>Paragraph</label>
+              <textarea value={form.paragraph} onChange={(e) => update("paragraph", e.target.value)} rows={4} style={inputStyle} />
             </div>
           </div>
 
-          <div style={{ background: "white", borderRadius: 12, padding: 20, marginBottom: 16, border: "1px solid #e0e0e0" }}>
+          <div style={sectionStyle}>
             <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>CTA Button</h2>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Button Copy</label>
-              <input type="text" value={form.ctaCopy} onChange={(e) => update("ctaCopy", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+              <label style={labelStyle}>Button Copy</label>
+              <input type="text" value={form.ctaCopy} onChange={(e) => update("ctaCopy", e.target.value)} style={inputStyle} />
             </div>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Offer Price</label>
-              <input type="text" value={form.offerPrice} onChange={(e) => update("offerPrice", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+              <label style={labelStyle}>Offer Price</label>
+              <input type="text" value={form.offerPrice} onChange={(e) => update("offerPrice", e.target.value)} style={inputStyle} />
             </div>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Original Price</label>
-              <input type="text" value={form.originalPrice} onChange={(e) => update("originalPrice", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+              <label style={labelStyle}>Original Price</label>
+              <input type="text" value={form.originalPrice} onChange={(e) => update("originalPrice", e.target.value)} style={inputStyle} />
             </div>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Decline Message</label>
-              <input type="text" value={form.declineMessage} onChange={(e) => update("declineMessage", e.target.value)} style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14 }} />
+              <label style={labelStyle}>Decline Message</label>
+              <input type="text" value={form.declineMessage} onChange={(e) => update("declineMessage", e.target.value)} style={inputStyle} />
             </div>
           </div>
         </div>
