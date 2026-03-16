@@ -59,6 +59,8 @@ export const action = async ({ request }) => {
     selectedProductId: formData.get("selectedProductId") || "",
     selectedVariantId: formData.get("selectedVariantId") || "",
     selectedProductTitle: formData.get("selectedProductTitle") || "",
+    revealAtSeconds: parseInt(formData.get("revealAtSeconds") || "0"),
+    revealParagraph: formData.get("revealParagraph") || "",
   };
 
   await prisma.offerSettings.upsert({
@@ -113,6 +115,12 @@ function Preview({ form }) {
         {form.paragraph && (
           <div style={{ fontSize: 13, color: "#444", lineHeight: 1.6, marginBottom: 20 }}>{form.paragraph}</div>
         )}
+        {form.revealAtSeconds > 0 && form.revealParagraph && (
+          <div style={{ fontSize: 13, color: "#444", lineHeight: 1.6, marginBottom: 20, background: "#f0eeff", padding: 12, borderRadius: 8, borderLeft: "3px solid #7c6af7" }}>
+            <div style={{ fontSize: 11, color: "#7c6af7", fontWeight: 600, marginBottom: 4 }}>REVEALS AT {form.revealAtSeconds}s</div>
+            {form.revealParagraph}
+          </div>
+        )}
         {form.selectedProductTitle && (
           <div style={{ fontSize: 12, color: "#888", marginBottom: 8, textAlign: "center" }}>Product: {form.selectedProductTitle}</div>
         )}
@@ -150,6 +158,8 @@ export default function Index() {
     selectedProductId: "",
     selectedVariantId: "",
     selectedProductTitle: "",
+    revealAtSeconds: 0,
+    revealParagraph: "",
     ...loaded,
   });
 
@@ -237,6 +247,14 @@ export default function Index() {
             <div style={{ marginBottom: 12 }}>
               <label style={labelStyle}>Show CTA after (seconds into video)</label>
               <input type="number" value={form.ctaDelaySeconds} onChange={(e) => update("ctaDelaySeconds", e.target.value)} style={inputStyle} />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={labelStyle}>Reveal extra content at video timestamp (seconds)</label>
+              <input type="number" value={form.revealAtSeconds || 0} placeholder="e.g. 271 for 4:31" onChange={(e) => update("revealAtSeconds", e.target.value)} style={inputStyle} />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={labelStyle}>Extra content to reveal at that timestamp</label>
+              <textarea value={form.revealParagraph || ""} onChange={(e) => update("revealParagraph", e.target.value)} rows={4} placeholder="This content appears when the video reaches the timestamp above..." style={inputStyle} />
             </div>
           </div>
 

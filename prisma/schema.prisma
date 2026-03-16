@@ -49,6 +49,8 @@ model OfferSettings {
   selectedProductId    String  @default("")
   selectedVariantId    String  @default("")
   selectedProductTitle String  @default("")
+  revealAtSeconds Int     @default(0)
+  revealParagraph String  @default("")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }

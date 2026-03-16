@@ -9,27 +9,29 @@ export const loader = async ({ request }) => {
     where: { shop },
   });
 
-  return settings || {};
+  return { ...(settings || {}), shop };
 };
 
 function getVideoEmbed(videoUrl) {
   if (!videoUrl) return null;
 
-  // YouTube
   if (videoUrl.includes("youtube.com") || videoUrl.includes("youtu.be")) {
-    const id = videoUrl.includes("v=")
-      ? videoUrl.split("v=")[1].split("&")[0]
-      : videoUrl.split("/").pop();
-    return `https://www.youtube.com/embed/${id}?autoplay=1`;
+    let id = "";
+    if (videoUrl.includes("v=")) {
+      id = videoUrl.split("v=")[1].split("&")[0];
+    } else if (videoUrl.includes("youtu.be/")) {
+      id = videoUrl.split("youtu.be/")[1].split("?")[0];
+    } else {
+      id = videoUrl.split("/").pop();
+    }
+    return `https://www.youtube.com/embed/${id}?autoplay=1&enablejsapi=1`;
   }
 
-  // Vimeo
   if (videoUrl.includes("vimeo.com")) {
     const id = videoUrl.split("/").pop();
     return `https://player.vimeo.com/video/${id}?autoplay=1`;
   }
 
-  // Direct MP4
   return null;
 }
 
@@ -37,29 +39,37 @@ export default function OfferPage() {
   const settings = useLoaderData();
 
   const {
+    shop = "",
     announcementBar = true,
-    barMessage = "⚡ Special one-time offer just for you!",
+    barMessage = "Special one-time offer just for you!",
     showCountdown = true,
     countdownMin = 14,
     brandColor = "#7c6af7",
     title = "Wait — before you go!",
     subtitle = "We've got an exclusive upgrade offer available only right now.",
     videoUrl = "",
-    thumbnailUrl = "",
     ctaDelaySeconds = 0,
     paragraph = "",
     ctaCopy = "Yes! Add to my order",
     offerPrice = "",
     originalPrice = "",
     declineMessage = "No thanks, I'll pass on this deal.",
+    selectedVariantId = "",
+    revealAtSeconds = 0,
+    revealParagraph = "",
   } = settings;
 
   const embedUrl = getVideoEmbed(videoUrl);
   const isMP4 = videoUrl && !embedUrl;
+  const isYouTube = embedUrl && embedUrl.includes("youtube.com");
 
   const ctaText = ctaCopy
     + (offerPrice ? ` — ${offerPrice}` : "")
     + (originalPrice ? ` (was ${originalPrice})` : "");
+
+  const numericVariantId = selectedVariantId
+    ? selectedVariantId.split("/").pop()
+    : "";
 
   return (
     <html>
@@ -67,6 +77,9 @@ export default function OfferPage() {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Special Offer</title>
+        {isYouTube && (
+          <script src="https://www.youtube.com/iframe_api" />
+        )}
         <style>{`
           * { box-sizing: border-box; margin: 0; padding: 0; }
           body { font-family: -apple-system, sans-serif; background: #f5f5f5; }
@@ -134,6 +147,31 @@ export default function OfferPage() {
             margin-bottom: 28px;
           }
 
+          .reveal-content {
+            display: none;
+            animation: fadeIn 0.6s ease;
+          }
+
+          .reveal-content.visible {
+            display: block;
+          }
+
+          @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+
+          .reveal-paragraph {
+            font-size: 15px;
+            color: #444;
+            line-height: 1.7;
+            margin-bottom: 28px;
+            padding: 16px;
+            background: #f0eeff;
+            border-left: 3px solid ${brandColor};
+            border-radius: 8px;
+          }
+
           .cta-btn {
             display: block;
             width: 100%;
@@ -176,6 +214,11 @@ export default function OfferPage() {
             border: none;
             width: 100%;
           }
+
+          .adding {
+            opacity: 0.7;
+            pointer-events: none;
+          }
         `}</style>
       </head>
       <body>
@@ -199,18 +242,25 @@ export default function OfferPage() {
             <div className="video-wrapper">
               {embedUrl && (
                 <iframe
+                  id="offer-video"
                   src={embedUrl}
                   allow="autoplay; fullscreen"
                   allowFullScreen
                 />
               )}
               {isMP4 && (
-                <video controls autoPlay src={videoUrl} />
+                <video id="offer-video-mp4" controls autoPlay src={videoUrl} />
               )}
             </div>
           )}
 
           {paragraph && <div className="paragraph">{paragraph}</div>}
+
+          <div className="reveal-content" id="reveal-content">
+            {revealParagraph && (
+              <div className="reveal-paragraph">{revealParagraph}</div>
+            )}
+          </div>
 
           {ctaDelaySeconds > 0 && (
             <div className="unlock-msg" id="unlock-msg">
@@ -231,6 +281,11 @@ export default function OfferPage() {
         </div>
 
         <script dangerouslySetInnerHTML={{ __html: `
+          var SHOP = "${shop}";
+          var VARIANT_ID = "${numericVariantId}";
+          var REVEAL_AT = ${revealAtSeconds};
+          var revealed = false;
+
           // Countdown timer
           var cdSecs = ${countdownMin * 60};
           var cdEl = document.getElementById('countdown');
@@ -250,6 +305,7 @@ export default function OfferPage() {
           var ctaTimer = document.getElementById('cta-timer');
 
           if (ctaDelay > 0 && ctaBtn) {
+            ctaBtn.classList.add('hidden');
             var remaining = ctaDelay;
             var t = setInterval(function() {
               remaining--;
@@ -261,6 +317,72 @@ export default function OfferPage() {
               }
             }, 1000);
           }
+
+          // Reveal content at video timestamp
+          function revealContent() {
+            if (revealed) return;
+            revealed = true;
+            var el = document.getElementById('reveal-content');
+            if (el) el.classList.add('visible');
+          }
+
+          // YouTube API
+          var ytPlayer;
+          var ytInterval;
+
+          window.onYouTubeIframeAPIReady = function() {
+            ytPlayer = new YT.Player('offer-video', {
+              events: {
+                onReady: function() {
+                  if (REVEAL_AT > 0) {
+                    ytInterval = setInterval(function() {
+                      if (ytPlayer && ytPlayer.getCurrentTime) {
+                        var currentTime = ytPlayer.getCurrentTime();
+                        if (currentTime >= REVEAL_AT) {
+                          revealContent();
+                          clearInterval(ytInterval);
+                        }
+                      }
+                    }, 1000);
+                  }
+                }
+              }
+            });
+          };
+
+          // MP4 video tracking
+          var mp4Video = document.getElementById('offer-video-mp4');
+          if (mp4Video && REVEAL_AT > 0) {
+            mp4Video.addEventListener('timeupdate', function() {
+              if (mp4Video.currentTime >= REVEAL_AT) {
+                revealContent();
+              }
+            });
+          }
+
+          // Add to cart
+          ctaBtn.addEventListener('click', function() {
+            if (!VARIANT_ID) {
+              alert('No product selected for this offer.');
+              return;
+            }
+            ctaBtn.textContent = 'Adding...';
+            ctaBtn.classList.add('adding');
+
+            fetch('https://' + SHOP + '/cart/add.js', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: VARIANT_ID, quantity: 1 })
+            })
+            .then(function(res) { return res.json(); })
+            .then(function() {
+              window.location.href = 'https://' + SHOP + '/cart';
+            })
+            .catch(function() {
+              ctaBtn.textContent = 'Try again';
+              ctaBtn.classList.remove('adding');
+            });
+          });
 
           // Decline
           document.getElementById('decline-btn').addEventListener('click', function() {
