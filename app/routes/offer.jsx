@@ -16,10 +16,7 @@ export const loader = async ({ request }) => {
   const countdownMin = s.countdownMin || 14;
   const brandColor = s.brandColor || "#7c6af7";
   const title = s.title || "Wait — before you go!";
-  const subtitle = s.subtitle || "We've got an exclusive upgrade offer available only right now.";
   const videoUrl = s.videoUrl || "";
-  const ctaDelaySeconds = s.ctaDelaySeconds || 0;
-  const paragraph = s.paragraph || "";
   const ctaCopy = s.ctaCopy || "Yes! Add to my order";
   const declineMessage = s.declineMessage || "No thanks, I'll pass on this deal.";
   const selectedVariantId = s.selectedVariantId || "";
@@ -33,7 +30,6 @@ export const loader = async ({ request }) => {
   const discountType = s.discountType || "percentage";
   const discountValue = s.discountValue || "";
 
-  // Calculate discounted price
   let discountedPrice = null;
   if (selectedVariantPrice && discountValue) {
     const p = parseFloat(selectedVariantPrice);
@@ -59,7 +55,6 @@ export const loader = async ({ request }) => {
 
   const isMP4 = videoUrl && !embedUrl;
   const numericVariantId = selectedVariantId ? selectedVariantId.split("/").pop() : "";
-  const ctaText = ctaCopy;
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -71,20 +66,34 @@ export const loader = async ({ request }) => {
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, sans-serif; background: #f5f5f5; }
-    .ann-bar { background: ${brandColor}; color: white; text-align: center; padding: 12px 16px; font-size: 14px; font-weight: 500; }
+
+    .ann-bar {
+      display: none;
+      background: ${brandColor};
+      color: white;
+      text-align: center;
+      padding: 12px 16px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .ann-bar.visible { display: block; animation: fadeIn 0.6s ease; }
     .countdown { font-family: monospace; font-size: 20px; font-weight: 700; letter-spacing: 3px; margin-top: 4px; }
+
     .container { max-width: 680px; margin: 0 auto; padding: 32px 20px; }
-    .title { font-size: 28px; font-weight: 700; color: #1a1a2e; margin-bottom: 10px; line-height: 1.2; }
-    .subtitle { font-size: 16px; color: #555; margin-bottom: 24px; line-height: 1.5; }
+    .pre-title { font-size: 28px; font-weight: 700; color: #1a1a2e; margin-bottom: 24px; line-height: 1.2; }
+
     .video-wrapper { position: relative; padding-bottom: 56.25%; height: 0; border-radius: 14px; overflow: hidden; margin-bottom: 24px; background: #000; }
     .video-wrapper iframe, .video-wrapper video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
-    .paragraph { font-size: 15px; color: #444; line-height: 1.7; margin-bottom: 28px; }
+
     .reveal-content { display: none; }
     .reveal-content.visible { display: block; animation: fadeIn 0.6s ease; }
+
     @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
     .reveal-title { font-size: 24px; font-weight: 700; color: #1a1a2e; margin-bottom: 8px; line-height: 1.2; }
     .reveal-subtitle { font-size: 16px; color: #555; margin-bottom: 16px; line-height: 1.5; }
     .reveal-paragraph { font-size: 15px; color: #444; line-height: 1.7; margin-bottom: 20px; }
+
     .product-card { display: flex; gap: 14px; align-items: center; background: white; border-radius: 12px; padding: 14px; margin-bottom: 20px; border: 1px solid #e0e0e0; }
     .product-img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
     .product-info { flex: 1; }
@@ -93,29 +102,25 @@ export const loader = async ({ request }) => {
     .original-price { font-size: 14px; color: #999; text-decoration: line-through; }
     .discounted-price { font-size: 18px; font-weight: 700; color: #e53e3e; }
     .regular-price { font-size: 16px; font-weight: 600; color: #1a1a2e; }
+
     .cta-btn { display: block; width: 100%; background: ${brandColor}; color: white; border: none; padding: 18px; border-radius: 12px; font-size: 17px; font-weight: 700; cursor: pointer; margin-bottom: 14px; transition: opacity 0.2s; }
     .cta-btn:hover { opacity: 0.9; }
-    .cta-btn.hidden { opacity: 0.4; pointer-events: none; }
-    .unlock-msg { text-align: center; font-size: 13px; color: #888; margin-bottom: 14px; font-style: italic; }
-    .decline { display: block; text-align: center; font-size: 13px; color: #999; text-decoration: underline; cursor: pointer; padding: 8px; background: none; border: none; width: 100%; }
     .adding { opacity: 0.7; pointer-events: none; }
+
+    .decline { display: block; text-align: center; font-size: 13px; color: #999; text-decoration: underline; cursor: pointer; padding: 8px; background: none; border: none; width: 100%; }
   </style>
 </head>
 <body>
-  ${announcementBar ? `
-  <div class="ann-bar">
+  <div class="ann-bar" id="ann-bar">
     <div>${barMessage}</div>
-    ${showCountdown ? `<div class="countdown" id="countdown">${String(countdownMin).padStart(2,"0")}:00</div>` : ''}
-  </div>` : ''}
+    ${showCountdown && announcementBar ? `<div class="countdown" id="countdown">${String(countdownMin).padStart(2,"0")}:00</div>` : ''}
+  </div>
 
   <div class="container">
-    <div class="title">${title}</div>
-    <div class="subtitle">${subtitle}</div>
+    <div class="pre-title">${title}</div>
 
     ${embedUrl ? `<div class="video-wrapper"><iframe id="offer-video" src="${embedUrl}" allow="autoplay; fullscreen" allowfullscreen></iframe></div>` : ''}
     ${isMP4 ? `<div class="video-wrapper"><video id="offer-video-mp4" controls autoplay src="${videoUrl}"></video></div>` : ''}
-
-    ${paragraph ? `<div class="paragraph">${paragraph}</div>` : ''}
 
     <div class="reveal-content" id="reveal-content">
       ${revealTitle ? `<div class="reveal-title">${revealTitle}</div>` : ''}
@@ -138,22 +143,22 @@ export const loader = async ({ request }) => {
         </div>
       </div>` : ''}
 
-      <button class="cta-btn" id="cta-btn">${ctaText}</button>
+      <button class="cta-btn" id="cta-btn">${ctaCopy}</button>
+      <button class="decline" id="decline-btn">${declineMessage}</button>
     </div>
-
-    <div class="decline" id="decline-btn">${declineMessage}</div>
   </div>
 
   <script>
     var SHOP = "${shop}";
     var VARIANT_ID = "${numericVariantId}";
     var REVEAL_AT = ${revealAtSeconds};
-    var CTA_DELAY = ${ctaDelaySeconds};
     var revealed = false;
 
+    // Countdown (only starts after reveal)
     var cdSecs = ${countdownMin * 60};
     var cdEl = document.getElementById('countdown');
-    if (cdEl) {
+    function startCountdown() {
+      if (!cdEl) return;
       setInterval(function() {
         if (cdSecs > 0) cdSecs--;
         var m = String(Math.floor(cdSecs/60)).padStart(2,'0');
@@ -162,15 +167,19 @@ export const loader = async ({ request }) => {
       }, 1000);
     }
 
-    var ctaBtn = document.getElementById('cta-btn');
-
     function revealContent() {
       if (revealed) return;
       revealed = true;
+      // Show announcement bar
+      var annBar = document.getElementById('ann-bar');
+      if (annBar) annBar.classList.add('visible');
+      startCountdown();
+      // Show reveal content
       var el = document.getElementById('reveal-content');
       if (el) el.classList.add('visible');
     }
 
+    // YouTube API
     var ytPlayer;
     window.onYouTubeIframeAPIReady = function() {
       ytPlayer = new YT.Player('offer-video', {
@@ -192,6 +201,7 @@ export const loader = async ({ request }) => {
       }, 3000);
     }
 
+    // MP4
     var mp4 = document.getElementById('offer-video-mp4');
     if (mp4 && REVEAL_AT > 0) {
       mp4.addEventListener('timeupdate', function() {
@@ -199,6 +209,8 @@ export const loader = async ({ request }) => {
       });
     }
 
+    // Add to cart
+    var ctaBtn = document.getElementById('cta-btn');
     if (ctaBtn) {
       ctaBtn.addEventListener('click', function() {
         if (!VARIANT_ID) { alert('No product selected.'); return; }
@@ -215,6 +227,7 @@ export const loader = async ({ request }) => {
       });
     }
 
+    // Decline
     document.getElementById('decline-btn').addEventListener('click', function() {
       document.body.innerHTML = '<div style="text-align:center;padding:60px 20px;font-family:sans-serif;"><h2>No problem!</h2><p style="color:#666;margin-top:10px;">Your order is confirmed. Thanks for shopping with us!</p></div>';
     });
