@@ -60,6 +60,8 @@ export const action = async ({ request }) => {
     selectedVariantId: formData.get("selectedVariantId") || "",
     selectedProductTitle: formData.get("selectedProductTitle") || "",
     revealAtSeconds: parseInt(formData.get("revealAtSeconds") || "0"),
+    revealTitle: formData.get("revealTitle") || "",
+    revealSubtitle: formData.get("revealSubtitle") || "",
     revealParagraph: formData.get("revealParagraph") || "",
   };
 
@@ -115,10 +117,12 @@ function Preview({ form }) {
         {form.paragraph && (
           <div style={{ fontSize: 13, color: "#444", lineHeight: 1.6, marginBottom: 20 }}>{form.paragraph}</div>
         )}
-        {form.revealAtSeconds > 0 && form.revealParagraph && (
-          <div style={{ fontSize: 13, color: "#444", lineHeight: 1.6, marginBottom: 20, background: "#f0eeff", padding: 12, borderRadius: 8, borderLeft: "3px solid #7c6af7" }}>
-            <div style={{ fontSize: 11, color: "#7c6af7", fontWeight: 600, marginBottom: 4 }}>REVEALS AT {form.revealAtSeconds}s</div>
-            {form.revealParagraph}
+        {(form.revealTitle || form.revealSubtitle || form.revealParagraph) && (
+          <div style={{ background: "#f0eeff", borderLeft: "3px solid #7c6af7", borderRadius: 8, padding: 12, marginBottom: 16 }}>
+            <div style={{ fontSize: 10, color: "#7c6af7", fontWeight: 700, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Reveals at {form.revealAtSeconds}s</div>
+            {form.revealTitle && <div style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e", marginBottom: 4 }}>{form.revealTitle}</div>}
+            {form.revealSubtitle && <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>{form.revealSubtitle}</div>}
+            {form.revealParagraph && <div style={{ fontSize: 12, color: "#444", lineHeight: 1.6 }}>{form.revealParagraph}</div>}
           </div>
         )}
         {form.selectedProductTitle && (
@@ -159,6 +163,8 @@ export default function Index() {
     selectedVariantId: "",
     selectedProductTitle: "",
     revealAtSeconds: 0,
+    revealTitle: "",
+    revealSubtitle: "",
     revealParagraph: "",
     ...loaded,
   });
@@ -248,13 +254,34 @@ export default function Index() {
               <label style={labelStyle}>Show CTA after (seconds into video)</label>
               <input type="number" value={form.ctaDelaySeconds} onChange={(e) => update("ctaDelaySeconds", e.target.value)} style={inputStyle} />
             </div>
+          </div>
+
+          <div style={sectionStyle}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Reveal Content at Timestamp</h2>
             <div style={{ marginBottom: 12 }}>
-              <label style={labelStyle}>Reveal extra content at video timestamp (seconds)</label>
+              <label style={labelStyle}>Reveal at (seconds into video)</label>
               <input type="number" value={form.revealAtSeconds || 0} placeholder="e.g. 271 for 4:31" onChange={(e) => update("revealAtSeconds", e.target.value)} style={inputStyle} />
             </div>
             <div style={{ marginBottom: 12 }}>
-              <label style={labelStyle}>Extra content to reveal at that timestamp</label>
-              <textarea value={form.revealParagraph || ""} onChange={(e) => update("revealParagraph", e.target.value)} rows={4} placeholder="This content appears when the video reaches the timestamp above..." style={inputStyle} />
+              <label style={labelStyle}>Reveal Title</label>
+              <input type="text" value={form.revealTitle || ""} placeholder="e.g. Here's your exclusive bonus..." onChange={(e) => update("revealTitle", e.target.value)} style={inputStyle} />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={labelStyle}>Reveal Subtitle</label>
+              <input type="text" value={form.revealSubtitle || ""} placeholder="e.g. Only available right now..." onChange={(e) => update("revealSubtitle", e.target.value)} style={inputStyle} />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={labelStyle}>Reveal Paragraph (max 3,000 characters)</label>
+              <textarea
+                value={form.revealParagraph || ""}
+                onChange={(e) => {
+                  if (e.target.value.length <= 3000) update("revealParagraph", e.target.value);
+                }}
+                rows={5}
+                placeholder="This content appears when the video reaches the timestamp above..."
+                style={inputStyle}
+              />
+              <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>{(form.revealParagraph || "").length}/3000</div>
             </div>
           </div>
 

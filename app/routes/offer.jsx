@@ -26,9 +26,10 @@ export const loader = async ({ request }) => {
   const declineMessage = s.declineMessage || "No thanks, I'll pass on this deal.";
   const selectedVariantId = s.selectedVariantId || "";
   const revealAtSeconds = s.revealAtSeconds || 0;
+  const revealTitle = s.revealTitle || "";
+  const revealSubtitle = s.revealSubtitle || "";
   const revealParagraph = s.revealParagraph || "";
 
-  // Get YouTube ID
   let ytId = null;
   if (videoUrl.includes("youtube.com") || videoUrl.includes("youtu.be")) {
     if (videoUrl.includes("v=")) ytId = videoUrl.split("v=")[1].split("&")[0];
@@ -70,7 +71,9 @@ export const loader = async ({ request }) => {
     .reveal-content { display: none; }
     .reveal-content.visible { display: block; animation: fadeIn 0.6s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-    .reveal-paragraph { font-size: 15px; color: #444; line-height: 1.7; margin-bottom: 28px; padding: 16px; background: #f0eeff; border-left: 3px solid ${brandColor}; border-radius: 8px; }
+    .reveal-title { font-size: 24px; font-weight: 700; color: #1a1a2e; margin-bottom: 8px; line-height: 1.2; }
+    .reveal-subtitle { font-size: 16px; color: #555; margin-bottom: 16px; line-height: 1.5; }
+    .reveal-paragraph { font-size: 15px; color: #444; line-height: 1.7; margin-bottom: 28px; }
     .cta-btn { display: block; width: 100%; background: ${brandColor}; color: white; border: none; padding: 18px; border-radius: 12px; font-size: 17px; font-weight: 700; cursor: pointer; margin-bottom: 14px; transition: opacity 0.2s; }
     .cta-btn:hover { opacity: 0.9; }
     .cta-btn.hidden { opacity: 0.4; pointer-events: none; }
@@ -103,6 +106,8 @@ export const loader = async ({ request }) => {
     ${paragraph ? `<div class="paragraph">${paragraph}</div>` : ''}
 
     <div class="reveal-content" id="reveal-content">
+      ${revealTitle ? `<div class="reveal-title">${revealTitle}</div>` : ''}
+      ${revealSubtitle ? `<div class="reveal-subtitle">${revealSubtitle}</div>` : ''}
       ${revealParagraph ? `<div class="reveal-paragraph">${revealParagraph}</div>` : ''}
     </div>
 
@@ -125,7 +130,6 @@ export const loader = async ({ request }) => {
     var CTA_DELAY = ${ctaDelaySeconds};
     var revealed = false;
 
-    // Countdown
     var cdSecs = ${countdownMin * 60};
     var cdEl = document.getElementById('countdown');
     if (cdEl) {
@@ -141,7 +145,6 @@ export const loader = async ({ request }) => {
     var unlockMsg = document.getElementById('unlock-msg');
     var ctaTimer = document.getElementById('cta-timer');
 
-    // CTA delay
     if (CTA_DELAY > 0 && ctaBtn) {
       var remaining = CTA_DELAY;
       var t = setInterval(function() {
@@ -160,21 +163,16 @@ export const loader = async ({ request }) => {
       revealed = true;
       var el = document.getElementById('reveal-content');
       if (el) el.classList.add('visible');
-      console.log('Content revealed!');
     }
 
-    // YouTube API
     var ytPlayer;
     window.onYouTubeIframeAPIReady = function() {
-      console.log('YouTube API ready');
       ytPlayer = new YT.Player('offer-video', {
         events: {
           onReady: function() {
-            console.log('Player ready, REVEAL_AT =', REVEAL_AT);
             if (REVEAL_AT > 0) {
               setInterval(function() {
-                var currentTime = ytPlayer.getCurrentTime();
-                if (currentTime >= REVEAL_AT) revealContent();
+                if (ytPlayer.getCurrentTime() >= REVEAL_AT) revealContent();
               }, 500);
             }
           }
@@ -182,17 +180,12 @@ export const loader = async ({ request }) => {
       });
     };
 
-    // Fallback timer if YouTube API fails
     if (REVEAL_AT > 0) {
       setTimeout(function() {
-        if (!ytPlayer) {
-          console.log('YT API fallback triggered');
-          setTimeout(revealContent, REVEAL_AT * 1000);
-        }
+        if (!ytPlayer) setTimeout(revealContent, REVEAL_AT * 1000);
       }, 3000);
     }
 
-    // MP4
     var mp4 = document.getElementById('offer-video-mp4');
     if (mp4 && REVEAL_AT > 0) {
       mp4.addEventListener('timeupdate', function() {
@@ -200,7 +193,6 @@ export const loader = async ({ request }) => {
       });
     }
 
-    // Add to cart
     ctaBtn.addEventListener('click', function() {
       if (!VARIANT_ID) { alert('No product selected.'); return; }
       ctaBtn.textContent = 'Adding...';
@@ -215,7 +207,6 @@ export const loader = async ({ request }) => {
       .catch(function() { ctaBtn.textContent = 'Try again'; ctaBtn.classList.remove('adding'); });
     });
 
-    // Decline
     document.getElementById('decline-btn').addEventListener('click', function() {
       document.body.innerHTML = '<div style="text-align:center;padding:60px 20px;font-family:sans-serif;"><h2>No problem!</h2><p style="color:#666;margin-top:10px;">Your order is confirmed. Thanks for shopping with us!</p></div>';
     });
