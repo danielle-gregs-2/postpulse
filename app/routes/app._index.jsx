@@ -17,6 +17,9 @@ export const loader = async ({ request }) => {
           node {
             id
             title
+            featuredImage {
+              url
+            }
             variants(first: 50) {
               edges {
                 node {
@@ -59,10 +62,14 @@ export const action = async ({ request }) => {
     selectedProductId: formData.get("selectedProductId") || "",
     selectedVariantId: formData.get("selectedVariantId") || "",
     selectedProductTitle: formData.get("selectedProductTitle") || "",
+    selectedProductImage: formData.get("selectedProductImage") || "",
+    selectedVariantPrice: formData.get("selectedVariantPrice") || "",
     revealAtSeconds: parseInt(formData.get("revealAtSeconds") || "0"),
     revealTitle: formData.get("revealTitle") || "",
     revealSubtitle: formData.get("revealSubtitle") || "",
     revealParagraph: formData.get("revealParagraph") || "",
+    discountType: formData.get("discountType") || "percentage",
+    discountValue: formData.get("discountValue") || "",
   };
 
   await prisma.offerSettings.upsert({
@@ -73,6 +80,16 @@ export const action = async ({ request }) => {
 
   return { success: true };
 };
+
+function calcDiscountedPrice(price, discountType, discountValue) {
+  if (!price || !discountValue) return null;
+  const p = parseFloat(price);
+  const v = parseFloat(discountValue);
+  if (isNaN(p) || isNaN(v)) return null;
+  if (discountType === "percentage") return (p * (1 - v / 100)).toFixed(2);
+  if (discountType === "fixed") return Math.max(0, p - v).toFixed(2);
+  return null;
+}
 
 function Preview({ form }) {
   const [seconds, setSeconds] = useState(
@@ -88,10 +105,8 @@ function Preview({ form }) {
   const mins = String(Math.floor(seconds / 60)).padStart(2, "0");
   const secs = String(seconds % 60).padStart(2, "0");
 
-  const ctaText =
-    (form.ctaCopy || "Yes! Add to my order") +
-    (form.offerPrice ? ` — ${form.offerPrice}` : "") +
-    (form.originalPrice ? ` (was ${form.originalPrice})` : "");
+  const ctaText = (form.ctaCopy || "Yes! Add to my order");
+  const discountedPrice = calcDiscountedPrice(form.selectedVariantPrice, form.discountType, form.discountValue);
 
   return (
     <div style={{ fontFamily: "sans-serif", background: "#f5f3ff", borderRadius: 16, overflow: "hidden", border: "1px solid #e0e0e0", maxWidth: 360, margin: "0 auto" }}>
@@ -106,31 +121,38 @@ function Preview({ form }) {
       <div style={{ padding: "20px 16px" }}>
         <div style={{ fontSize: 22, fontWeight: 700, color: "#1a1a2e", marginBottom: 8 }}>{form.title}</div>
         <div style={{ fontSize: 14, color: "#666", marginBottom: 16 }}>{form.subtitle}</div>
-        {form.thumbnailUrl && (
-          <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", marginBottom: 16, aspectRatio: "16/9", background: "#1a1a2e" }}>
-            <img src={form.thumbnailUrl} alt="thumbnail" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.3)" }}>
-              <div style={{ width: 48, height: 48, background: "white", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>▶</div>
-            </div>
-          </div>
-        )}
         {form.paragraph && (
           <div style={{ fontSize: 13, color: "#444", lineHeight: 1.6, marginBottom: 20 }}>{form.paragraph}</div>
         )}
-        {(form.revealTitle || form.revealSubtitle || form.revealParagraph) && (
+        {(form.revealTitle || form.revealSubtitle || form.revealParagraph || form.selectedProductTitle) && (
           <div style={{ background: "#f0eeff", borderLeft: "3px solid #7c6af7", borderRadius: 8, padding: 12, marginBottom: 16 }}>
-            <div style={{ fontSize: 10, color: "#7c6af7", fontWeight: 700, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Reveals at {form.revealAtSeconds}s</div>
-            {form.revealTitle && <div style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e", marginBottom: 4 }}>{form.revealTitle}</div>}
+            <div style={{ fontSize: 10, color: "#7c6af7", fontWeight: 700, marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Reveals at {form.revealAtSeconds}s</div>
+            {form.revealTitle && <div style={{ fontSize: 18, fontWeight: 700, color: "#1a1a2e", marginBottom: 4 }}>{form.revealTitle}</div>}
             {form.revealSubtitle && <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>{form.revealSubtitle}</div>}
-            {form.revealParagraph && <div style={{ fontSize: 12, color: "#444", lineHeight: 1.6 }}>{form.revealParagraph}</div>}
+            {form.revealParagraph && <div style={{ fontSize: 12, color: "#444", lineHeight: 1.6, marginBottom: 12 }}>{form.revealParagraph}</div>}
+            {form.selectedProductTitle && (
+              <div style={{ background: "white", borderRadius: 8, padding: 10, display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
+                {form.selectedProductImage && (
+                  <img src={form.selectedProductImage} alt="product" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6 }} />
+                )}
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a2e" }}>{form.selectedProductTitle}</div>
+                  {discountedPrice ? (
+                    <div style={{ fontSize: 13, marginTop: 2 }}>
+                      <span style={{ textDecoration: "line-through", color: "#999", marginRight: 6 }}>${parseFloat(form.selectedVariantPrice).toFixed(2)}</span>
+                      <span style={{ color: "#e53e3e", fontWeight: 700 }}>${discountedPrice}</span>
+                    </div>
+                  ) : form.selectedVariantPrice ? (
+                    <div style={{ fontSize: 13, color: "#444", marginTop: 2 }}>${parseFloat(form.selectedVariantPrice).toFixed(2)}</div>
+                  ) : null}
+                </div>
+              </div>
+            )}
+            <button style={{ display: "block", width: "100%", background: form.brandColor || "#7c6af7", color: "white", border: "none", padding: "12px 16px", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+              {ctaText}
+            </button>
           </div>
         )}
-        {form.selectedProductTitle && (
-          <div style={{ fontSize: 12, color: "#888", marginBottom: 8, textAlign: "center" }}>Product: {form.selectedProductTitle}</div>
-        )}
-        <button style={{ display: "block", width: "100%", background: form.brandColor || "#7c6af7", color: "white", border: "none", padding: "14px 16px", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer", marginBottom: 10 }}>
-          {ctaText}
-        </button>
         <div style={{ textAlign: "center", fontSize: 12, color: "#888", textDecoration: "underline", cursor: "pointer" }}>{form.declineMessage}</div>
       </div>
     </div>
@@ -162,10 +184,14 @@ export default function Index() {
     selectedProductId: "",
     selectedVariantId: "",
     selectedProductTitle: "",
+    selectedProductImage: "",
+    selectedVariantPrice: "",
     revealAtSeconds: 0,
     revealTitle: "",
     revealSubtitle: "",
     revealParagraph: "",
+    discountType: "percentage",
+    discountValue: "",
     ...loaded,
   });
 
@@ -176,9 +202,18 @@ export default function Index() {
 
   const handleProductChange = (productId) => {
     const product = products.find(p => p.id === productId);
+    const firstVariant = product ? product.variants.edges[0].node : null;
     update("selectedProductId", productId);
     update("selectedProductTitle", product ? product.title : "");
-    update("selectedVariantId", product ? product.variants.edges[0].node.id : "");
+    update("selectedProductImage", product?.featuredImage?.url || "");
+    update("selectedVariantId", firstVariant ? firstVariant.id : "");
+    update("selectedVariantPrice", firstVariant ? firstVariant.price : "");
+  };
+
+  const handleVariantChange = (variantId) => {
+    const variant = variants.find(v => v.id === variantId);
+    update("selectedVariantId", variantId);
+    update("selectedVariantPrice", variant ? variant.price : "");
   };
 
   const handleSave = () => {
@@ -190,6 +225,8 @@ export default function Index() {
   const inputStyle = { width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: 6, fontSize: 14, boxSizing: "border-box" };
   const labelStyle = { display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 };
   const sectionStyle = { background: "white", borderRadius: 12, padding: 20, marginBottom: 16, border: "1px solid #e0e0e0" };
+
+  const discountedPrice = calcDiscountedPrice(form.selectedVariantPrice, form.discountType, form.discountValue);
 
   return (
     <div style={{ fontFamily: "sans-serif", maxWidth: 1200, margin: "0 auto", padding: 24 }}>
@@ -264,21 +301,18 @@ export default function Index() {
             </div>
             <div style={{ marginBottom: 12 }}>
               <label style={labelStyle}>Reveal Title</label>
-              <input type="text" value={form.revealTitle || ""} placeholder="e.g. Here's your exclusive bonus..." onChange={(e) => update("revealTitle", e.target.value)} style={inputStyle} />
+              <input type="text" value={form.revealTitle || ""} onChange={(e) => update("revealTitle", e.target.value)} style={inputStyle} />
             </div>
             <div style={{ marginBottom: 12 }}>
               <label style={labelStyle}>Reveal Subtitle</label>
-              <input type="text" value={form.revealSubtitle || ""} placeholder="e.g. Only available right now..." onChange={(e) => update("revealSubtitle", e.target.value)} style={inputStyle} />
+              <input type="text" value={form.revealSubtitle || ""} onChange={(e) => update("revealSubtitle", e.target.value)} style={inputStyle} />
             </div>
             <div style={{ marginBottom: 12 }}>
               <label style={labelStyle}>Reveal Paragraph (max 3,000 characters)</label>
               <textarea
                 value={form.revealParagraph || ""}
-                onChange={(e) => {
-                  if (e.target.value.length <= 3000) update("revealParagraph", e.target.value);
-                }}
+                onChange={(e) => { if (e.target.value.length <= 3000) update("revealParagraph", e.target.value); }}
                 rows={5}
-                placeholder="This content appears when the video reaches the timestamp above..."
                 style={inputStyle}
               />
               <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>{(form.revealParagraph || "").length}/3000</div>
@@ -299,11 +333,39 @@ export default function Index() {
             {variants.length > 0 && (
               <div style={{ marginBottom: 12 }}>
                 <label style={labelStyle}>Select Variant</label>
-                <select value={form.selectedVariantId} onChange={(e) => update("selectedVariantId", e.target.value)} style={inputStyle}>
+                <select value={form.selectedVariantId} onChange={(e) => handleVariantChange(e.target.value)} style={inputStyle}>
                   {variants.map(v => (
                     <option key={v.id} value={v.id}>{v.title} — ${v.price}</option>
                   ))}
                 </select>
+              </div>
+            )}
+            {form.selectedVariantPrice && (
+              <div style={{ marginBottom: 12 }}>
+                <label style={labelStyle}>Discount Type</label>
+                <select value={form.discountType} onChange={(e) => update("discountType", e.target.value)} style={inputStyle}>
+                  <option value="percentage">Percentage Off (%)</option>
+                  <option value="fixed">Fixed Amount Off ($)</option>
+                </select>
+              </div>
+            )}
+            {form.selectedVariantPrice && (
+              <div style={{ marginBottom: 12 }}>
+                <label style={labelStyle}>{form.discountType === "percentage" ? "Discount Percentage" : "Discount Amount ($)"}</label>
+                <input
+                  type="number"
+                  value={form.discountValue}
+                  placeholder={form.discountType === "percentage" ? "e.g. 20 for 20% off" : "e.g. 10 for $10 off"}
+                  onChange={(e) => update("discountValue", e.target.value)}
+                  style={inputStyle}
+                />
+                {discountedPrice && (
+                  <div style={{ fontSize: 12, color: "#555", marginTop: 6 }}>
+                    Original: <span style={{ textDecoration: "line-through" }}>${parseFloat(form.selectedVariantPrice).toFixed(2)}</span>
+                    {" → "}
+                    <span style={{ color: "#e53e3e", fontWeight: 700 }}>${discountedPrice}</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -321,14 +383,6 @@ export default function Index() {
             <div style={{ marginBottom: 12 }}>
               <label style={labelStyle}>Button Copy</label>
               <input type="text" value={form.ctaCopy} onChange={(e) => update("ctaCopy", e.target.value)} style={inputStyle} />
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <label style={labelStyle}>Offer Price</label>
-              <input type="text" value={form.offerPrice} onChange={(e) => update("offerPrice", e.target.value)} style={inputStyle} />
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <label style={labelStyle}>Original Price</label>
-              <input type="text" value={form.originalPrice} onChange={(e) => update("originalPrice", e.target.value)} style={inputStyle} />
             </div>
             <div style={{ marginBottom: 12 }}>
               <label style={labelStyle}>Decline Message</label>

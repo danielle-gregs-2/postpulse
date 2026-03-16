@@ -21,14 +21,28 @@ export const loader = async ({ request }) => {
   const ctaDelaySeconds = s.ctaDelaySeconds || 0;
   const paragraph = s.paragraph || "";
   const ctaCopy = s.ctaCopy || "Yes! Add to my order";
-  const offerPrice = s.offerPrice || "";
-  const originalPrice = s.originalPrice || "";
   const declineMessage = s.declineMessage || "No thanks, I'll pass on this deal.";
   const selectedVariantId = s.selectedVariantId || "";
+  const selectedProductTitle = s.selectedProductTitle || "";
+  const selectedProductImage = s.selectedProductImage || "";
+  const selectedVariantPrice = s.selectedVariantPrice || "";
   const revealAtSeconds = s.revealAtSeconds || 0;
   const revealTitle = s.revealTitle || "";
   const revealSubtitle = s.revealSubtitle || "";
   const revealParagraph = s.revealParagraph || "";
+  const discountType = s.discountType || "percentage";
+  const discountValue = s.discountValue || "";
+
+  // Calculate discounted price
+  let discountedPrice = null;
+  if (selectedVariantPrice && discountValue) {
+    const p = parseFloat(selectedVariantPrice);
+    const v = parseFloat(discountValue);
+    if (!isNaN(p) && !isNaN(v)) {
+      if (discountType === "percentage") discountedPrice = (p * (1 - v / 100)).toFixed(2);
+      if (discountType === "fixed") discountedPrice = Math.max(0, p - v).toFixed(2);
+    }
+  }
 
   let ytId = null;
   if (videoUrl.includes("youtube.com") || videoUrl.includes("youtu.be")) {
@@ -45,10 +59,7 @@ export const loader = async ({ request }) => {
 
   const isMP4 = videoUrl && !embedUrl;
   const numericVariantId = selectedVariantId ? selectedVariantId.split("/").pop() : "";
-
-  const ctaText = ctaCopy
-    + (offerPrice ? ` — ${offerPrice}` : "")
-    + (originalPrice ? ` (was ${originalPrice})` : "");
+  const ctaText = ctaCopy;
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -73,7 +84,15 @@ export const loader = async ({ request }) => {
     @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
     .reveal-title { font-size: 24px; font-weight: 700; color: #1a1a2e; margin-bottom: 8px; line-height: 1.2; }
     .reveal-subtitle { font-size: 16px; color: #555; margin-bottom: 16px; line-height: 1.5; }
-    .reveal-paragraph { font-size: 15px; color: #444; line-height: 1.7; margin-bottom: 28px; }
+    .reveal-paragraph { font-size: 15px; color: #444; line-height: 1.7; margin-bottom: 20px; }
+    .product-card { display: flex; gap: 14px; align-items: center; background: white; border-radius: 12px; padding: 14px; margin-bottom: 20px; border: 1px solid #e0e0e0; }
+    .product-img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
+    .product-info { flex: 1; }
+    .product-name { font-size: 15px; font-weight: 600; color: #1a1a2e; margin-bottom: 6px; }
+    .price-row { display: flex; align-items: center; gap: 8px; }
+    .original-price { font-size: 14px; color: #999; text-decoration: line-through; }
+    .discounted-price { font-size: 18px; font-weight: 700; color: #e53e3e; }
+    .regular-price { font-size: 16px; font-weight: 600; color: #1a1a2e; }
     .cta-btn { display: block; width: 100%; background: ${brandColor}; color: white; border: none; padding: 18px; border-radius: 12px; font-size: 17px; font-weight: 700; cursor: pointer; margin-bottom: 14px; transition: opacity 0.2s; }
     .cta-btn:hover { opacity: 0.9; }
     .cta-btn.hidden { opacity: 0.4; pointer-events: none; }
@@ -93,15 +112,8 @@ export const loader = async ({ request }) => {
     <div class="title">${title}</div>
     <div class="subtitle">${subtitle}</div>
 
-    ${embedUrl ? `
-    <div class="video-wrapper">
-      <iframe id="offer-video" src="${embedUrl}" allow="autoplay; fullscreen" allowfullscreen></iframe>
-    </div>` : ''}
-
-    ${isMP4 ? `
-    <div class="video-wrapper">
-      <video id="offer-video-mp4" controls autoplay src="${videoUrl}"></video>
-    </div>` : ''}
+    ${embedUrl ? `<div class="video-wrapper"><iframe id="offer-video" src="${embedUrl}" allow="autoplay; fullscreen" allowfullscreen></iframe></div>` : ''}
+    ${isMP4 ? `<div class="video-wrapper"><video id="offer-video-mp4" controls autoplay src="${videoUrl}"></video></div>` : ''}
 
     ${paragraph ? `<div class="paragraph">${paragraph}</div>` : ''}
 
@@ -109,18 +121,27 @@ export const loader = async ({ request }) => {
       ${revealTitle ? `<div class="reveal-title">${revealTitle}</div>` : ''}
       ${revealSubtitle ? `<div class="reveal-subtitle">${revealSubtitle}</div>` : ''}
       ${revealParagraph ? `<div class="reveal-paragraph">${revealParagraph}</div>` : ''}
+
+      ${selectedProductTitle ? `
+      <div class="product-card">
+        ${selectedProductImage ? `<img class="product-img" src="${selectedProductImage}" alt="${selectedProductTitle}" />` : ''}
+        <div class="product-info">
+          <div class="product-name">${selectedProductTitle}</div>
+          <div class="price-row">
+            ${discountedPrice ? `
+              <span class="original-price">$${parseFloat(selectedVariantPrice).toFixed(2)}</span>
+              <span class="discounted-price">$${discountedPrice}</span>
+            ` : selectedVariantPrice ? `
+              <span class="regular-price">$${parseFloat(selectedVariantPrice).toFixed(2)}</span>
+            ` : ''}
+          </div>
+        </div>
+      </div>` : ''}
+
+      <button class="cta-btn" id="cta-btn">${ctaText}</button>
     </div>
 
-    ${ctaDelaySeconds > 0 ? `
-    <div class="unlock-msg" id="unlock-msg">
-      Your offer unlocks in <span id="cta-timer">${ctaDelaySeconds}</span> seconds...
-    </div>` : ''}
-
-    <button class="cta-btn${ctaDelaySeconds > 0 ? ' hidden' : ''}" id="cta-btn">
-      ${ctaText || "Yes! Add to my order"}
-    </button>
-
-    <button class="decline" id="decline-btn">${declineMessage}</button>
+    <div class="decline" id="decline-btn">${declineMessage}</div>
   </div>
 
   <script>
@@ -142,21 +163,6 @@ export const loader = async ({ request }) => {
     }
 
     var ctaBtn = document.getElementById('cta-btn');
-    var unlockMsg = document.getElementById('unlock-msg');
-    var ctaTimer = document.getElementById('cta-timer');
-
-    if (CTA_DELAY > 0 && ctaBtn) {
-      var remaining = CTA_DELAY;
-      var t = setInterval(function() {
-        remaining--;
-        if (ctaTimer) ctaTimer.textContent = remaining;
-        if (remaining <= 0) {
-          clearInterval(t);
-          ctaBtn.classList.remove('hidden');
-          if (unlockMsg) unlockMsg.style.display = 'none';
-        }
-      }, 1000);
-    }
 
     function revealContent() {
       if (revealed) return;
@@ -193,19 +199,21 @@ export const loader = async ({ request }) => {
       });
     }
 
-    ctaBtn.addEventListener('click', function() {
-      if (!VARIANT_ID) { alert('No product selected.'); return; }
-      ctaBtn.textContent = 'Adding...';
-      ctaBtn.classList.add('adding');
-      fetch('https://' + SHOP + '/cart/add.js', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: VARIANT_ID, quantity: 1 })
-      })
-      .then(function(r) { return r.json(); })
-      .then(function() { window.location.href = 'https://' + SHOP + '/cart'; })
-      .catch(function() { ctaBtn.textContent = 'Try again'; ctaBtn.classList.remove('adding'); });
-    });
+    if (ctaBtn) {
+      ctaBtn.addEventListener('click', function() {
+        if (!VARIANT_ID) { alert('No product selected.'); return; }
+        ctaBtn.textContent = 'Adding...';
+        ctaBtn.classList.add('adding');
+        fetch('https://' + SHOP + '/cart/add.js', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: VARIANT_ID, quantity: 1 })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function() { window.location.href = 'https://' + SHOP + '/cart'; })
+        .catch(function() { ctaBtn.textContent = 'Try again'; ctaBtn.classList.remove('adding'); });
+      });
+    }
 
     document.getElementById('decline-btn').addEventListener('click', function() {
       document.body.innerHTML = '<div style="text-align:center;padding:60px 20px;font-family:sans-serif;"><h2>No problem!</h2><p style="color:#666;margin-top:10px;">Your order is confirmed. Thanks for shopping with us!</p></div>';
